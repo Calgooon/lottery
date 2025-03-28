@@ -1,0 +1,20 @@
+OWNER
+_______
+Address: 1KxdCGxkzXXaE4VheqjWonALBtB1UE1V22
+Private Key: L12nzYZNo1k1TwSWzkwT899kpSyAwtSEMfXxaM9P3znw3RAnamcw
+Public Key: 022121cd1c0ceae8658a71adc8dcef11c2ab87a189257a56a4acb84e34b05497f1
+
+
+
+
+
+PLAYER
+_______
+Address: 15vqvZvrxwAsPD5nSEwp14Y9BrHRYSnmZx
+Private Key: L4pXiHEfG2B3byWenBWqDDGozv6EZoxNrLnGavDFg6Jd3fomjZYR
+Public Key: 03306f3f0cc2cf9a3299c09c2fbbd0a05e52c665b6a808c04d4d4aff64c12b5571
+PLAYER
+_______
+Address: 1LDFeAafkp6Z9KkFoWCkQSaMPAKDWVCNR7
+Private Key: L219Rmzqe9JuuN1xx7eHxHXB6KaeBn789tYwJzf6njX6wHQQpUBG
+Public Key: 03b96c7cbde55f77845beea90ebb961ff0c949c15a14b9cceb92917309a3ebb5a4
