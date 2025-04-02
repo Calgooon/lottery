@@ -39,12 +39,6 @@ export class Lottery extends SmartContract {
     @prop(true)
     isOver: boolean // Track if lottery has been drawn
 
-    // Generate a random SHA256 nonce
-    @method()
-    static generateNonce(randomBytes: ByteString): Sha256 {
-        return sha256(randomBytes)
-    }
-
     constructor(
         owner: PubKey,
         participants: FixedArray<PubKey, 2>,
@@ -66,21 +60,14 @@ export class Lottery extends SmartContract {
             this.checkSig(sig, this.owner),
             'Only the owner can enter participants'
         )
-        // console.log(this.ctx.hashOutputs)
-        // console.log(this.ctx.hashPrevouts)
-        // console.log(this.ctx)
-        // // Verify entry fee
-        // assert(this.ctx.utxo.value == 10n, 'Incorrect entry fee');
 
-        this.totalAmount = 10n
+        this.totalAmount = amount
 
         let output: ByteString =
             this.buildStateOutput(this.totalAmount) + this.buildChangeOutput()
-        // const hashOutputs = hash256(output)
-        // console.log(hashOutputs)
-        // c output = this.buildStateOutput(1n) + this.buildChangeOutput()
-        // const hashOutputs2 = hash256(output2)
-        // console.log(hashOutputs2)
+
+        this.debug.diffOutputs(output)
+        
         assert(
             this.ctx.hashOutputs === hash256(output),
             'New utxo must have enough to pay winner'
@@ -132,26 +119,9 @@ export class Lottery extends SmartContract {
             .addOutput(
                 new Transaction.Output({
                     script: nextInstance.lockingScript,
-                    satoshis: Number(current.balance),
+                    satoshis: Number(amount),
                 })
             )
-        // .change(options.changeAddress)
-        // // build refund output
-        // .addOutput(
-        //     new Transaction.Output({
-        //         script: Script.fromHex(
-        //             Utils.buildPublicKeyHashScript(hash160(current.owner))
-        //         ),
-        //         satoshis: current.balance,
-        //     })
-        // )
-        // build change output// build change output
-        // if (options.changeAddress) {
-        //     // build change output
-        //     unsignedTx.change(options.changeAddress)
-        // }
-
-        // console.log(unsignedTx)
 
         return Promise.resolve({
             tx: unsignedTx,
@@ -160,7 +130,7 @@ export class Lottery extends SmartContract {
                 {
                     instance: nextInstance,
                     atOutputIndex: 0,
-                    balance: Number(nextInstance.balance),
+                    balance: Number(amount),
                 },
             ],
         })
