@@ -17,78 +17,85 @@ import {
     ContractTransaction,
     MethodCallOptions,
     UTXO,
-} from 'scrypt-ts';
+    pubKey2Addr,
+} from 'scrypt-ts'
 import Transaction = bsv.Transaction
 import Script = bsv.Script
 import Address = bsv.Address
 
-
 export class Lottery extends SmartContract {
-
     @prop()
-    owner: PubKey;  // Contract owner
+    owner: PubKey // Contract owner
 
     @prop(true)
-    participants: FixedArray<PubKey, 2>; // List of participant public keys
+    participants: FixedArray<PubKey, 2> // List of participant public keys
 
     @prop(true)
-    nonceHashes: FixedArray<Sha256, 2>; // List of nonce hashes
+    nonceHashes: FixedArray<Sha256, 2> // List of nonce hashes
 
     @prop(true)
-    totalAmount: bigint; // Track total amount from all participants
+    totalAmount: bigint // Track total amount from all participants
 
     @prop(true)
-    isOver: boolean; // Track if lottery has been drawn
+    isOver: boolean // Track if lottery has been drawn
 
     // Generate a random SHA256 nonce
     @method()
     static generateNonce(randomBytes: ByteString): Sha256 {
-        return sha256(randomBytes);
+        return sha256(randomBytes)
     }
 
-    constructor(owner: PubKey,
+    constructor(
+        owner: PubKey,
         participants: FixedArray<PubKey, 2>,
-        nonceHashes: FixedArray<Sha256, 2>) {
-        super(...arguments);
-        this.owner = owner;
-        this.participants = participants;
-        this.nonceHashes = nonceHashes;
-        this.totalAmount = 0n;
-        this.isOver = false;
+        nonceHashes: FixedArray<Sha256, 2>
+    ) {
+        super(...arguments)
+        this.owner = owner
+        this.participants = participants
+        this.nonceHashes = nonceHashes
+        this.totalAmount = 0n
+        this.isOver = false
     }
 
     @method()
-    public fund(sig: Sig) {
-        assert(!this.isOver, 'Lottery has already been drawn');
+    public fund(sig: Sig, amount: bigint) {
+        assert(!this.isOver, 'Lottery has already been drawn')
         // Only the owner can add a participant
-        assert(this.checkSig(sig, this.owner), 'Only the owner can enter participants');
-        console.log(this.ctx.hashOutputs)
-        console.log(this.ctx.hashPrevouts)
-        console.log(this.ctx)
+        assert(
+            this.checkSig(sig, this.owner),
+            'Only the owner can enter participants'
+        )
+        // console.log(this.ctx.hashOutputs)
+        // console.log(this.ctx.hashPrevouts)
+        // console.log(this.ctx)
         // // Verify entry fee
         // assert(this.ctx.utxo.value == 10n, 'Incorrect entry fee');
 
-        this.totalAmount = 10n;
+        this.totalAmount = 10n
 
-
-        const output: ByteString = this.buildStateOutput(1n)
-        const hashOutputs = hash256(output)
-        console.log(hashOutputs)
-        const output2 = this.buildStateOutput(1n) + this.buildChangeOutput()
-        const hashOutputs2 = hash256(output2)
-        console.log(hashOutputs2)
-
-        assert(this.ctx.hashOutputs === hashOutputs, 'New utxo must have enough to pay winner');
+        let output: ByteString =
+            this.buildStateOutput(this.totalAmount) + this.buildChangeOutput()
+        // const hashOutputs = hash256(output)
+        // console.log(hashOutputs)
+        // c output = this.buildStateOutput(1n) + this.buildChangeOutput()
+        // const hashOutputs2 = hash256(output2)
+        // console.log(hashOutputs2)
+        assert(
+            this.ctx.hashOutputs === hash256(output),
+            'New utxo must have enough to pay winner'
+        )
+        // assert(true)
     }
 
     @method()
     public draw(nonce: FixedArray<bigint, 2>, sig: Sig) {
         // Only owner can draw the winner
-        assert(this.checkSig(sig, this.owner), 'Only the owner can draw');
-        assert(!this.isOver, 'Lottery has already been drawn');
-        assert(this.totalAmount > 0n, 'No satoshis in lottery');
+        assert(this.checkSig(sig, this.owner), 'Only the owner can draw')
+        assert(!this.isOver, 'Lottery has already been drawn')
+        assert(this.totalAmount > 0n, 'No satoshis in lottery')
 
-        this.isOver = true;
+        this.isOver = true
 
         let sum = 0n
 
@@ -101,19 +108,19 @@ export class Lottery extends SmartContract {
         const winner: PubKey = this.participants[Number(sum % BigInt(2))]
 
         // Transfer funds to winner
-        const outputs = Utils.buildOutput(
-            Utils.buildPublicKeyHashScript(hash160(winner)),
-            this.totalAmount
-        );
-
-        assert(this.ctx.hashOutputs === hash256(outputs), 'Output mismatch');
+        const outputs =
+            Utils.buildPublicKeyHashOutput(
+                pubKey2Addr(winner),
+                this.totalAmount
+            ) + this.buildChangeOutput()
+        assert(this.ctx.hashOutputs == hash256(outputs), 'Output mismatch')
     }
 
     // User defined transaction builder for calling function `bid`
     static fundTxBuilder(
         current: Lottery,
         options: MethodCallOptions<Lottery>,
-        // fundingTx: UTXO
+        amount: bigint
     ): Promise<ContractTransaction> {
         const nextInstance = current.next()
         // console.log(options.fromUTXO)
@@ -125,10 +132,10 @@ export class Lottery extends SmartContract {
             .addOutput(
                 new Transaction.Output({
                     script: nextInstance.lockingScript,
-                    satoshis: Number(1),
+                    satoshis: Number(current.balance),
                 })
             )
-            // .change(options.changeAddress)
+        // .change(options.changeAddress)
         // // build refund output
         // .addOutput(
         //     new Transaction.Output({
@@ -153,9 +160,46 @@ export class Lottery extends SmartContract {
                 {
                     instance: nextInstance,
                     atOutputIndex: 0,
-                    balance: Number(10),
+                    balance: Number(nextInstance.balance),
                 },
             ],
+        })
+    }
+
+    static async drawTxBuilder(
+        current: Lottery,
+        options: MethodCallOptions<Lottery>,
+        nonce: FixedArray<bigint, 2>
+    ): Promise<ContractTransaction> {
+        let sum = 0n
+
+        for (let i = 0; i < 2; i++) {
+            assert(hash256(int2ByteString(nonce[i])) == current.nonceHashes[i])
+
+            sum += nonce[i]
+        }
+        const winner: PubKey = current.participants[Number(sum % BigInt(2))]
+        const defaultChangeAddress = await current.signer.getDefaultAddress()
+        const unsignedTx: bsv.Transaction = new bsv.Transaction()
+            // add contract input
+            .addInput(current.buildContractInput(options.fromUTXO))
+
+            // build winner output
+            .addOutput(
+                new bsv.Transaction.Output({
+                    script: bsv.Script.fromHex(
+                        Utils.buildPublicKeyHashScript(pubKey2Addr(winner))
+                    ),
+                    satoshis: Number(current.totalAmount),
+                })
+            )
+            // build change output
+            .change(options.changeAddress || defaultChangeAddress)
+
+        return Promise.resolve({
+            tx: unsignedTx,
+            atInputIndex: 0,
+            nexts: [],
         })
     }
 }
