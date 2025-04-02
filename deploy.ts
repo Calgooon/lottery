@@ -11,7 +11,7 @@ import {
     findSig,
     MethodCallOptions,
 } from 'scrypt-ts'
-import { randomPrivateKey, getDefaultSigner } from './tests/utils/txHelper'
+import { randomPrivateKey, getDefaultSigner, sleep } from './tests/utils/txHelper'
 import * as dotenv from 'dotenv'
 import { randomBytes } from 'crypto'
 
@@ -81,6 +81,8 @@ async function main() {
     )
 
     console.log('Fund tx: ', fundTx.id)
+
+    await sleep(5)
 
     const latestInstance = Lottery.fromTx(fundTx, 0)
     await latestInstance.connect(signer)

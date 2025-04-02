@@ -65,8 +65,6 @@ export class Lottery extends SmartContract {
 
         let output: ByteString =
             this.buildStateOutput(this.totalAmount) + this.buildChangeOutput()
-
-        this.debug.diffOutputs(output)
         
         assert(
             this.ctx.hashOutputs === hash256(output),
@@ -87,12 +85,13 @@ export class Lottery extends SmartContract {
         let sum = 0n
 
         for (let i = 0; i < 2; i++) {
-            assert(hash256(int2ByteString(nonce[i])) == this.nonceHashes[i])
+            assert(sha256(int2ByteString(nonce[i])) == this.nonceHashes[i])
 
             sum += nonce[i]
         }
 
         const winner: PubKey = this.participants[Number(sum % BigInt(2))]
+        console.log(Number(sum % BigInt(2)))
 
         // Transfer funds to winner
         const outputs =
@@ -144,7 +143,7 @@ export class Lottery extends SmartContract {
         let sum = 0n
 
         for (let i = 0; i < 2; i++) {
-            assert(hash256(int2ByteString(nonce[i])) == current.nonceHashes[i])
+            assert(sha256(int2ByteString(nonce[i])) == current.nonceHashes[i])
 
             sum += nonce[i]
         }
