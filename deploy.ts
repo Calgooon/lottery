@@ -3,50 +3,103 @@ import {
     bsv,
     TestWallet,
     DefaultProvider,
-    sha256,
     toByteString,
+    FixedArray,
+    PubKey,
+    sha256,
+    int2ByteString,
+    findSig,
+    MethodCallOptions,
 } from 'scrypt-ts'
-
+import { randomPrivateKey, getDefaultSigner, sleep } from './tests/utils/txHelper'
 import * as dotenv from 'dotenv'
+import { randomBytes } from 'crypto'
 
 // Load the .env file
 dotenv.config()
 
-if(!process.env.PRIVATE_KEY) {
-    throw new Error("No \"PRIVATE_KEY\" found in .env, Please run \"npm run genprivkey\" to generate a private key")
-}
-
 // Read the private key from the .env file.
 // The default private key inside the .env file is meant to be used for the Bitcoin testnet.
 // See https://scrypt.io/docs/bitcoin-basics/bsv/#private-keys
-const privateKey = bsv.PrivateKey.fromWIF(process.env.PRIVATE_KEY || '')
+// const privateKey = bsv.PrivateKey.fromWIF(process.env.PRIVATE_KEY || '')
+// const [ownerPrivKey, ownerPubKey, ,] = randomPrivateKey()
+// const [player1PrivKey, player1PubKey, ,] = randomPrivateKey()
+// const [player2PrivKey, player2PubKey, ,] = randomPrivateKey()
+let owner: bsv.PrivateKey = bsv.PrivateKey.fromWIF('L12nzYZNo1k1TwSWzkwT899kpSyAwtSEMfXxaM9P3znw3RAnamcw');
+let player1: bsv.PrivateKey = bsv.PrivateKey.fromWIF('L4pXiHEfG2B3byWenBWqDDGozv6EZoxNrLnGavDFg6Jd3fomjZYR');
+let player2: bsv.PrivateKey = bsv.PrivateKey.fromWIF('L219Rmzqe9JuuN1xx7eHxHXB6KaeBn789tYwJzf6njX6wHQQpUBG');
 
 // Prepare signer.
 // See https://scrypt.io/docs/how-to-deploy-and-call-a-contract/#prepare-a-signer-and-provider
-const signer = new TestWallet(
-    privateKey,
-    new DefaultProvider({
-        network: bsv.Networks.testnet,
-    })
-)
+const signer = getDefaultSigner(owner)
+
+function generateRandomNonce(): bigint {
+    const randomData = randomBytes(32)
+    return BigInt('0x' + randomData.toString('hex'))
+}
 
 async function main() {
     await Lottery.loadArtifact()
 
-    // TODO: Adjust the amount of satoshis locked in the smart contract:
-    const amount = 1
+    let instance: Lottery
 
-    const instance = new Lottery(
-        // TODO: Adjust constructor parameter values:
-        sha256(toByteString('hello world', true))
+    let nonce1: bigint = generateRandomNonce()
+    let nonce2: bigint = generateRandomNonce()
+
+    instance = new Lottery(
+        PubKey(owner.publicKey.toString()),
+        [PubKey(player1.publicKey.toString()), PubKey(player2.publicKey.toString())],
+        [sha256(int2ByteString(nonce1)), sha256(int2ByteString(nonce2))]
     )
+
+    console.log(await signer.getBalance())
 
     // Connect to a signer.
     await instance.connect(signer)
 
     // Contract deployment.
+    const amount = 1
     const deployTx = await instance.deploy(amount)
-    console.log(`Lottery contract deployed: ${deployTx.id}`)
-}
+    console.log('Lottery contract deployed: ', deployTx.id)
 
+    const newInstance = Lottery.fromTx(deployTx, 0)
+    await newInstance.connect(signer)
+
+    const nextInstance = newInstance.next()
+    nextInstance.totalAmount = 10n
+
+    const { tx: fundTx, next } = await newInstance.methods.fund(
+        (sigReps) => findSig(sigReps, owner.publicKey),
+        10n,
+        {
+            pubKeyOrAddrToSign: owner.publicKey,
+            next: {
+                instance: nextInstance,
+                balance: Number(nextInstance.totalAmount),
+            },
+        } as MethodCallOptions<Lottery>
+    )
+
+    console.log('Fund tx: ', fundTx.id)
+
+    await sleep(5)
+
+    const latestInstance = Lottery.fromTx(fundTx, 0)
+    await latestInstance.connect(signer)
+    latestInstance.bindTxBuilder('draw', Lottery.drawTxBuilder)
+    const next2Instance = latestInstance.next()
+    const nonce: FixedArray<bigint, 2> = [nonce1, nonce2]
+    const { tx: drawTx, next: next2 } = await latestInstance.methods.draw(
+        nonce,
+        (sigReps) => findSig(sigReps, owner.publicKey),
+        {
+            pubKeyOrAddrToSign: owner.publicKey,
+            next: {
+                instance: next2Instance,
+                balance: 0,
+            },
+        } as MethodCallOptions<Lottery>
+    )
+    console.log('Draw tx: ', drawTx.id)
+}
 main()
