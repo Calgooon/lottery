@@ -89,7 +89,7 @@ async function main() {
     latestInstance.bindTxBuilder('draw', Lottery.drawTxBuilder)
     const next2Instance = latestInstance.next()
     const nonce: FixedArray<bigint, 2> = [nonce1, nonce2]
-    const { tx: drawTx, next: next2 } = await next2Instance.methods.draw(
+    const { tx: drawTx, next: next2 } = await latestInstance.methods.draw(
         nonce,
         (sigReps) => findSig(sigReps, owner.publicKey),
         {

@@ -153,7 +153,7 @@ export class Lottery extends SmartContract {
         
         const unsignedTx: bsv.Transaction = new bsv.Transaction()
             // add contract input
-            .addInput(current.buildContractInput(options.fromUTXO))
+            .addInput(current.buildContractInput())
             // build winner output first
             .addOutput(
                 new bsv.Transaction.Output({
