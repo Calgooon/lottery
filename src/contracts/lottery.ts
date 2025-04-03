@@ -96,7 +96,7 @@ export class Lottery extends SmartContract {
         // Transfer funds to winner
         const outputs =
             Utils.buildPublicKeyHashOutput(
-                pubKey2Addr(winner),
+                hash160(winner),
                 this.totalAmount
             ) + this.buildChangeOutput()
         assert(this.ctx.hashOutputs == hash256(outputs), 'Output mismatch')
@@ -135,6 +135,7 @@ export class Lottery extends SmartContract {
         })
     }
 
+
     static async drawTxBuilder(
         current: Lottery,
         options: MethodCallOptions<Lottery>,
@@ -144,31 +145,31 @@ export class Lottery extends SmartContract {
 
         for (let i = 0; i < 2; i++) {
             assert(sha256(int2ByteString(nonce[i])) == current.nonceHashes[i])
-
             sum += nonce[i]
         }
         const winner: PubKey = current.participants[Number(sum % BigInt(2))]
-        const defaultChangeAddress = await current.signer.getDefaultAddress()
+
+        console.log(current.owner)
+        
         const unsignedTx: bsv.Transaction = new bsv.Transaction()
             // add contract input
             .addInput(current.buildContractInput(options.fromUTXO))
-
-            // build winner output
+            // build winner output first
             .addOutput(
                 new bsv.Transaction.Output({
                     script: bsv.Script.fromHex(
-                        Utils.buildPublicKeyHashScript(pubKey2Addr(winner))
+                        Utils.buildPublicKeyHashScript(hash160(winner))
                     ),
                     satoshis: Number(current.totalAmount),
                 })
             )
             // build change output
-            .change(options.changeAddress || defaultChangeAddress)
+            .change('1KxdCGxkzXXaE4VheqjWonALBtB1UE1V22')
 
         return Promise.resolve({
             tx: unsignedTx,
             atInputIndex: 0,
-            nexts: [],
+            nexts: [], // No next instance needed since contract is over
         })
     }
 }

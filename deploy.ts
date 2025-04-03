@@ -87,17 +87,16 @@ async function main() {
     const latestInstance = Lottery.fromTx(fundTx, 0)
     await latestInstance.connect(signer)
     latestInstance.bindTxBuilder('draw', Lottery.drawTxBuilder)
-    const next2Instance = newInstance.next()
-    latestInstance.totalAmount = 10n
+    const next2Instance = latestInstance.next()
     const nonce: FixedArray<bigint, 2> = [nonce1, nonce2]
-    const { tx: drawTx, next: next2 } = await latestInstance.methods.draw(
+    const { tx: drawTx, next: next2 } = await next2Instance.methods.draw(
         nonce,
         (sigReps) => findSig(sigReps, owner.publicKey),
         {
             pubKeyOrAddrToSign: owner.publicKey,
             next: {
                 instance: next2Instance,
-                balance: latestInstance.balance,
+                balance: 0,
             },
         } as MethodCallOptions<Lottery>
     )
